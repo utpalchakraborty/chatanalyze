@@ -11,7 +11,7 @@ class PostItem(object):
     def __init__(self, dt, name, rest):
         self._dt = dt
         self._name = name.decode("utf-8-sig").encode("utf-8").strip()
-        self._rest = rest
+        self._rest = rest.decode("utf-8-sig").encode("utf-8").strip()
         self._lines = []
 
     def add_line(self, line):
@@ -29,6 +29,17 @@ class PostItem(object):
     def is_phone(self):
         return not self._name.replace(' ', '').isalpha()
 
+    @property
+    def is_image(self):
+        return 'image omitted' in self._rest
+
+    @property
+    def is_video(self):
+        return 'video omitted' in self._rest
+
+    @property
+    def is_lol(self):
+        return 'lol' in self._rest.lower()
 
     @property
     def is_birthday(self):
@@ -74,6 +85,7 @@ def get_post_items(file_name):
             dt, name, rest = get_time(line)
             if dt and name and rest:
                 current = PostItem(dt, name, rest)
+                print current.is_image
                 items.append(current)
             else:
                 current.add_line(line)
@@ -105,6 +117,40 @@ def plot_post_freq(f):
     plt.show()
 
 
+def print_media_statistics(caption, p_groups, media_dict):
+    print '-----------------------------------------------------------'
+    data = []
+    for k, v in media_dict.items():
+        count = len(v)
+        percent = (count * 100.0)/len(p_groups[k])
+        data.append((k, count, percent))
+
+    data = sorted(data, key=lambda x : x[2], reverse=True)
+    for d in data:
+        print 'Total {} by {} = {}.    {}%'.format(caption, d[0], d[1], d[2])
+
+
+def media_statistics(p_groups):
+    images = {}
+    videos = {}
+    media = {}
+    lols = {}
+    for p, items in p_groups.items():
+        images[p] = [item for item in items if item.is_image]
+        videos[p] = [item for item in items if item.is_video]
+        media[p] = [item for item in items if item.is_video or item.is_image]
+        lols[p] = [item for item in items if item.is_video or item.is_lol]
+
+    print_media_statistics('image', p_groups, images)
+    print_media_statistics('video', p_groups, videos)
+    print_media_statistics('media', p_groups, media)
+    print_media_statistics('lols', p_groups, lols)
+
+
+
+
+
+
 if __name__ == '__main__':
 
     post_items = get_post_items('/home/utpal/chats/PanoChat.txt')
@@ -114,7 +160,8 @@ if __name__ == '__main__':
     post_items = [item for item in post_items if not (item.is_birthday or item.is_phone)]
     people_groups = get_people_groups(post_items)
     post_freq = print_post_frequency_by_people(people_groups)
-    plot_post_freq(post_freq)
+    media_statistics(people_groups)
+    #plot_post_freq(post_freq)
 
     """
     peoples = people_groups.keys()

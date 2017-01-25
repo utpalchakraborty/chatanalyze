@@ -85,7 +85,6 @@ def get_post_items(file_name):
             dt, name, rest = get_time(line)
             if dt and name and rest:
                 current = PostItem(dt, name, rest)
-                print current.is_image
                 items.append(current)
             else:
                 current.add_line(line)
@@ -147,8 +146,19 @@ def media_statistics(p_groups):
     print_media_statistics('lols', p_groups, lols)
 
 
+def display_month_trend(p_items):
+    month_groups = {k: list(g) for k, g in itertools.groupby(p_items, key=lambda t: t.month)}
+    x = []
+    y = []
+    for k, v in month_groups.items():
+        print k, len(v)
+        x.append(k)
+        y.append(len(v))
 
-
+    plt.scatter(x, y)
+    plt.plot(np.unique(x), np.poly1d(np.polyfit(x, y, 1))(np.unique(x)))
+    plt.plot(np.unique(x), np.poly1d(np.polyfit(x, y, 2))(np.unique(x)))
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -158,10 +168,16 @@ if __name__ == '__main__':
     print 'all lines parsed'
 
     post_items = [item for item in post_items if not (item.is_birthday or item.is_phone)]
+    display_month_trend(post_items)
+
+
+    """
     people_groups = get_people_groups(post_items)
     post_freq = print_post_frequency_by_people(people_groups)
     media_statistics(people_groups)
     #plot_post_freq(post_freq)
+
+    """
 
     """
     peoples = people_groups.keys()

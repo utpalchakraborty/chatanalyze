@@ -2,8 +2,9 @@ import datetime
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 plt.rcdefaults()
-import matplotlib.pyplot as plt
+
 
 
 class PostItem(object):
@@ -20,6 +21,10 @@ class PostItem(object):
     @property
     def month(self):
         return self._dt.date().month
+
+    @property
+    def hour(self):
+        return self._dt.time().hour
 
     @property
     def name(self):
@@ -64,14 +69,13 @@ def get_time(line):
 def count_adjacent(post_items, poster1, poster2, start_month=0, scan_ahead=1):
     index = 0
     count = 0
-    while index < len(post_items) - 2:
+    while index < len(post_items) - (1 + scan_ahead):
         current_post = post_items[index]
-        next_post = post_items[index + 1]
         if current_post.month >= start_month:
-            if current_post.name == poster1 and next_post.name == poster2:
-                count += 1
-            #elif current_post.name == poster2 and next_post.name == poster1:
-            #    count += 1
+            if current_post.name == poster1:
+                next_posts_names = [post.name for post in post_items[index + 1:index + 1 + scan_ahead]]
+                if poster2 in next_posts_names:
+                    count += 1
         index += 1
     return count
 
@@ -85,14 +89,16 @@ def get_post_items(file_name):
             dt, name, rest = get_time(line)
             if dt and name and rest:
                 current = PostItem(dt, name, rest)
+                print current.hour
                 items.append(current)
             else:
                 current.add_line(line)
     return items
 
 
-def get_people_groups(items):
-    return {k: list(g) for k, g in itertools.groupby(sorted(items, key=lambda t: t.name), key=lambda t: t.name)}
+def get_people_groups(items, min_count=10):
+    p = {k: list(g) for k, g in itertools.groupby(sorted(items, key=lambda t: t.name), key=lambda t: t.name)}
+    return {k: v for k, v in p.items() if len(v) > min_count}
 
 
 def print_post_frequency_by_people(p_groups):
@@ -161,35 +167,58 @@ def display_month_trend(p_items):
     plt.show()
 
 
-if __name__ == '__main__':
+def print_adjacency_list_for(name, a_list):
+    print('-----------------------------------------------')
+    a_list = [i for i in a_list if i[1] == name]
+    names = []
+    freq = []
 
-    post_items = get_post_items('/home/utpal/chats/PanoChat.txt')
+    for i in sorted(a_list, key=lambda x: x[3], reverse=False):
+        print '{}, {} = {},   {}%'.format(i[0], i[1], i[2], i[3])
+        names.append(i[0])
+        freq.append(i[2])
 
-    print 'all lines parsed'
+    '''
+    objects = tuple(names)
+    y_pos = np.arange(len(objects))
+    plt.barh(y_pos, freq, align='center', alpha=0.5)
+    plt.yticks(y_pos, objects)
+    plt.ylabel('')
+    plt.title('Post Frequency of {}'.format(name))
 
-    post_items = [item for item in post_items if not (item.is_birthday or item.is_phone)]
-    display_month_trend(post_items)
+    plt.show()
+    '''
 
 
-    """
-    people_groups = get_people_groups(post_items)
-    post_freq = print_post_frequency_by_people(people_groups)
-    media_statistics(people_groups)
-    #plot_post_freq(post_freq)
+def radial_bar_plot(keys, values):
+    # force square figure and square axes looks better for polar, IMO
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_axes([0.1, 0.1, 0.8, 0.8], polar=True)
+    ax.xaxis.set_major_formatter(plt.NullFormatter())
 
-    """
+    N = len(keys) #24
+    theta = np.arange(0.0, 2 * np.pi, 2 * np.pi / N)
+    radii = values #10 * np.random.rand(N)
+    width = np.pi / N #4 * np.random.rand(N)
+    bars = ax.bar(theta, radii, width=width, bottom=0.0)
+    for r, bar in zip(radii, bars):
+        bar.set_facecolor(cm.jet(r / 1000.))
+        bar.set_alpha(0.5)
 
-    """
-    peoples = people_groups.keys()
+    plt.show()
+
+
+def compute_adjacency(p_groups, p_items):
+    peoples = p_groups.keys()
     adjacency_list = []
     percentages = []
-    #print peoples
+    # print peoples
     for p1 in peoples:
         for p2 in peoples:
             if p1 != p2:
-                count = count_adjacent(post_items, p1, p2)
+                count = count_adjacent(p_items, p1, p2, scan_ahead=3)
                 if count > 0:
-                    percent = (count * 100.0)/len(people_groups[p2])
+                    percent = (count * 100.0)/len(p_groups[p1])
                     tup = p1, p2, count, percent
                     adjacency_list.append(tup)
                     percentages.append(percent)
@@ -197,16 +226,35 @@ if __name__ == '__main__':
     print "Mean", np.mean(percentages)
     print "Std", np.std(percentages)
 
-    for i in sorted(adjacency_list, key=lambda x : x[2], reverse=True):
-        print '{}, {} = {}'.format(i[0], i[1], i[2])
+    for p1 in peoples:
+        print_adjacency_list_for(p1, adjacency_list)
+
+if __name__ == '__main__':
+
+    post_items = get_post_items('/home/utpal/chats/PanoChat.txt')
+    print 'all lines parsed'
+
+    post_items = [item for item in post_items if not (item.is_birthday or item.is_phone)]
+    hour_freq = {k: 0 for k in range(0, 24)}
+    for item in post_items:
+        hour_freq[item.hour] += 1
+
+    print hour_freq
+    print hour_freq.keys()
+    print hour_freq.values()
+    radial_bar_plot(hour_freq.keys(), hour_freq.values())
+
+    """
+    # display_month_trend(post_items)
+
+    people_groups = get_people_groups(post_items)
+    compute_adjacency(people_groups, post_items)
     """
 
     """
-    month_groups = {k: list(g)  for k, g in itertools.groupby(post_items, key=lambda t : t.month)}
-
-
-    for k, v in month_groups.items():
-        print k, len(v)
+    post_freq = print_post_frequency_by_people(people_groups)
+    media_statistics(people_groups)
+    #plot_post_freq(post_freq)
 
     """
 
